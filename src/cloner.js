@@ -213,7 +213,7 @@ export class Cloner {
         attachments: final ? message.attachments.map(a => ({
           id: a.id,
           name: a.name,
-          attachment: a.attachment,
+          url: a.url,
           spoiler: a.spoiler,
         })) : undefined,
         allowedMentions: {
