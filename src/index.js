@@ -34,6 +34,8 @@ selfBotClient.on("ready", async () => {
 
   console.log("[SELF BOT] Clone finished! Starting listeners...");
   initialized = true;
+
+  setInterval(async () => await cloner.sync(), 5 * 60 * 1000);
 });
 
 selfBotClient.on("messageCreate", async message => {

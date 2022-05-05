@@ -31,4 +31,8 @@ export class WebhookManager {
 
     return this.webhooks[channel.id];
   }
+
+  clearWebhooks() {
+    this.webhooks = {};
+  }
 }

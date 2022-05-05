@@ -88,6 +88,8 @@ export class Cloner {
 
   async sync() {
     console.log("[SELF BOT] Syncing channels...");
+    this.webhookManager.clearWebhooks();
+
     for (const channel of this.source.channels.cache.values()) {
       if (channel.type === "GUILD_CATEGORY") await this.clone(channel.id);
     }
@@ -107,7 +109,6 @@ export class Cloner {
         console.log(`[CLONER] Failed to rename channel ${channel.name} (${channel.id}) to ${mapped.name} (${mapped.id})`);
       }
     }
-
 
     console.log("[SELF BOT] Reordering channels...")
     await this.reorder();
@@ -138,9 +139,6 @@ export class Cloner {
       for (const message of messages.values()) {
         if (lastMessage && lastMessage.createdAt && lastMessage.createdAt.getTime() >= message.createdAt.getTime()) continue;
         await this.cloneMessage(message, false);
-
-        storage.backlog[channel.id] = message.id;
-        saveStorage();
       }
 
       console.log(`[CLONER] Backlogged ${messages.size} in ${channel.name} (${channel.id})`);
@@ -153,6 +151,9 @@ export class Cloner {
     const channel: TextChannel = await this.getCloned(message.channel.id);
     const webhook: WebhookClient = await this.webhookManager.getClient(channel);
     if (!channel) return;
+
+    storage.backlog[channel.id] = message.id;
+    saveStorage();
 
     let content = "";
     if (message.reference) {
