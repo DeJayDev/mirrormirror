@@ -210,7 +210,12 @@ export class Cloner {
         username: message.author.username,
         avatarURL: message.author.avatarURL(),
         embeds: final ? message.embeds : undefined,
-        attachments: final ? message.attachments : undefined,
+        attachments: final ? message.attachments.map(a => ({
+          id: a.id,
+          name: a.name,
+          attachment: a.attachment,
+          spoiler: a.spoiler,
+        })) : undefined,
         allowedMentions: {
           parse: mentions ? ["users", "roles", "everyone"] : [],
         }
