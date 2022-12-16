@@ -1,5 +1,3 @@
-// @flow
-
 import fs from "fs";
 
 export const config: Config = require("../config.json");

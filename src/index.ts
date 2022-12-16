@@ -1,14 +1,17 @@
-const DiscordSelfbot = require("discord.js-selfbot-v13");
-const Discord = require("discord.js");
-const {config} = require("./config");
-const {Cloner} = require("./cloner");
-const {WebhookManager} = require("./webhook");
+import DiscordSelfbot from "discord.js-selfbot-v13";
+import { Client, Intents } from "discord.js";
+import { config } from "./config";
+import { Cloner } from "./cloner";
+import { WebhookManager } from "./webhook";
 
 const selfBotClient = new DiscordSelfbot.Client({
   checkUpdate: false
 });
-const botClient = new Discord.Client({
-  intents: ["GUILD_MESSAGES", "GUILD_MEMBERS", "GUILDS"]
+const botClient = new Client({
+  intents: [Intents.FLAGS.GUILDS, Intents.FLAGS.GUILD_MESSAGES, Intents.FLAGS.GUILD_MEMBERS],
+  http: {
+    version: 11
+  }
 });
 
 let cloner: Cloner;
@@ -29,7 +32,7 @@ selfBotClient.on("ready", async () => {
   cloner = new Cloner(sourceGuild, targetGuild, webhookManager);
 
   console.log("[SELF BOT] Purging legacy channels...");
-  await cloner.purgeLegacy(targetGuild);
+  await cloner.purgeLegacy();
   await cloner.sync();
 
   console.log("[SELF BOT] Clone finished! Starting listeners...");
@@ -39,8 +42,16 @@ selfBotClient.on("ready", async () => {
 });
 
 selfBotClient.on("messageCreate", async message => {
-  console.log(`[${message.guild.name}] ${message.author.username}: ${message.content}`);
-  if (message.guildId !== config.guilds.source || !initialized) return;
+  if (!message.guild || message.guildId !== config.guilds.source || !initialized) return;
+
+  let title = '';
+  if(message.content) {
+    title = message.content;
+  } else if(message.embeds.length > 0) {
+    title = message.embeds[0].title;
+  }
+
+  console.log(`[${message.guild.name}] ${message.author.username}: ${message.content ? message.content : message.embeds[0].title}`);
   await cloner.cloneMessage(message);
 });
 

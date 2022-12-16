@@ -1,17 +1,17 @@
-import {TextChannel, WebhookClient} from "discord.js";
+import {GuildBasedChannel, GuildTextBasedChannel, TextChannel, Webhook} from "discord.js";
 
 export class WebhookManager {
   name: string;
-  webhooks: Record<string, WebhookClient>;
+  webhooks: Record<string, Webhook>;
 
   constructor(name: string) {
     this.name = name;
     this.webhooks = {};
   }
 
-  async getClient(channel: TextChannel): Promise<WebhookClient> {
+  async getClient(channel: GuildBasedChannel): Promise<Webhook> {
     if (!this.webhooks[channel.id]) {
-      const webhook = (await channel.fetchWebhooks()).find(value => value.name === this.name);
+      const webhook = (await (channel as TextChannel).fetchWebhooks()).find(value => value.name === this.name);
 
       if (webhook) {
         this.webhooks[channel.id] = webhook;
@@ -19,7 +19,7 @@ export class WebhookManager {
         return webhook;
       } else {
         console.log(`[WEBHOOK] ${this.name} webhook not found in ${channel.name}`);
-        const created = await channel.createWebhook(this.name, {
+        const created = await (channel as TextChannel).createWebhook(this.name, {
           reason: "Webhook for " + this.name
         });
 

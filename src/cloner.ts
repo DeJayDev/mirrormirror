@@ -1,28 +1,27 @@
-// @flow
-
-import {Channel, ChannelPosition, Guild, Message, TextChannel, WebhookClient} from "discord.js";
-import {saveStorage, storage} from "./config";
-import {WebhookManager} from "./webhook";
+import { ChannelPosition, Guild as BotGuild, GuildBasedChannel, GuildChannelTypes, GuildTextBasedChannel, Webhook } from "discord.js";
+import { Guild as SelfGuild, GuildTextBasedChannel as SelfGuildTextBasedChannel, Message as SelfMessage, TextChannel } from "discord.js-selfbot-v13";
+import { saveStorage, storage } from "./config";
+import { WebhookManager } from "./webhook";
 
 export class Cloner {
-  source: Guild;
-  target: Guild;
+  source: SelfGuild;
+  target: BotGuild;
   webhookManager: WebhookManager;
 
-  constructor(source: Guild, target: Guild, webhookManager: WebhookManager) {
+  constructor(source: SelfGuild, target: BotGuild, webhookManager: WebhookManager) {
     this.source = source;
     this.target = target;
     this.webhookManager = webhookManager;
   }
 
-  async clone(id: string): Promise<Channel> {
+  async clone(id: string): Promise<GuildBasedChannel> {
     if (storage.channels[id]) {
       const mapped = storage.channels[id];
       return await this.target.channels.fetch(mapped);
     }
 
     const channel = await this.source.channels.fetch(id);
-    const perms = await channel.permissionsFor(this.source.me);
+    const perms = channel.permissionsFor(this.source.me);
 
     if (!perms || !perms.has("VIEW_CHANNEL")) {
       storage.channels[channel.id] = null;
@@ -31,10 +30,10 @@ export class Cloner {
     }
 
     const result = await this.target.channels.create(channel.name, {
-      type: channel.type === "GUILD_NEWS" ? "GUILD_TEXT" : channel.type,
-      topic: channel.topic,
+      type: channel.type as GuildChannelTypes,
+      topic: channel.type === 'GUILD_TEXT' ? (channel as TextChannel).topic : null,
       reason: "Cloned from " + channel.name,
-      parent: channel.parent ? await this.getCloned(channel.parent.id) : undefined,
+      parent: channel.parentId ? (await this.getCloned(channel.parent.id)).id : undefined,
     });
 
     storage.channels[channel.id] = result.id;
@@ -63,7 +62,7 @@ export class Cloner {
     await this.target.channels.setPositions(positions);
   }
 
-  async getCloned(id: string): Promise<Channel | null> {
+  async getCloned(id: string): Promise<GuildBasedChannel | null> {
     const mapped = storage.channels[id];
     if (!mapped) {
       return this.clone(id);
@@ -114,6 +113,11 @@ export class Cloner {
     await this.reorder();
 
     // Backlog
+    if (this.source.channels.cache.size > 50) {
+        console.log("[SELF BOT] Skipping backlog due to large channel count");
+        return;
+    }
+
     for (const channel of this.source.channels.cache.values()) {
       if (channel.type === "GUILD_TEXT" || channel.type === "GUILD_NEWS") {
         setImmediate(async () => await this.backlog(channel));
@@ -121,10 +125,10 @@ export class Cloner {
     }
   }
 
-  async backlog(channel: TextChannel) {
+  async backlog(channel: SelfGuildTextBasedChannel) {
     // Oldest to newest
     try {
-      const perms = await channel.permissionsFor(this.source.me);
+      const perms = channel.permissionsFor(this.source.me);
       if (!perms || !perms.has("VIEW_CHANNEL")) {
         return;
       }
@@ -147,9 +151,9 @@ export class Cloner {
     }
   }
 
-  async cloneMessage(message: Message, mentions = true) {
-    const channel: TextChannel = await this.getCloned(message.channel.id);
-    const webhook: WebhookClient = await this.webhookManager.getClient(channel);
+  async cloneMessage(message: SelfMessage, mentions = true) {
+    const channel: GuildTextBasedChannel = (await this.getCloned(message.channel.id)) as GuildTextBasedChannel;
+    const webhook: Webhook = await this.webhookManager.getClient(channel);
     if (!channel) return;
 
     storage.backlog[channel.id] = message.id;
@@ -159,7 +163,7 @@ export class Cloner {
     if (message.reference) {
       try {
         const referencedChannel = await message.guild.channels.fetch(message.reference.channelId);
-        const reference = await referencedChannel.messages.fetch(message.reference.messageId);
+        const reference = await (referencedChannel as SelfGuildTextBasedChannel).messages.fetch(message.reference.messageId);
         if (reference) {
           content += `> ${reference.content.split("\n").join("\n> ")}\n> Reply from ${reference.author}\n`;
         }
@@ -187,6 +191,7 @@ export class Cloner {
     });
 
     message.mentions.channels.forEach(channel => {
+      if (channel.type === "DM") return;
       if (!channel.name) return;
 
       const mappedId = storage.channels[channel.id];
