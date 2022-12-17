@@ -10,7 +10,8 @@ export interface Config {
   guilds: {
     source: string,
     target: string,
-  }
+    skipBackfill?: boolean,
+  }[]
 }
 
 export interface MirrorStorage {

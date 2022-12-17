@@ -24,7 +24,7 @@ export class WebhookManager {
         });
 
         this.webhooks[channel.id] = created;
-        console.log(`[WEBHOOK] Created webhook ${JSON.stringify(created)} in ${channel.name}`);
+        console.log(`[WEBHOOK] Created webhook in ${channel.name}`);
         return created;
       }
     }

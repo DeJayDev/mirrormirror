@@ -1,5 +1,6 @@
-import { ChannelPosition, Guild as BotGuild, GuildBasedChannel, GuildChannelTypes, GuildTextBasedChannel, Webhook } from "discord.js";
+import { ChannelPosition, Constants, Guild as BotGuild, GuildBasedChannel, GuildTextBasedChannel, Webhook } from "discord.js";
 import { Guild as SelfGuild, GuildTextBasedChannel as SelfGuildTextBasedChannel, Message as SelfMessage, TextChannel } from "discord.js-selfbot-v13";
+import { ChannelTypes } from "discord.js/typings/enums";
 import { saveStorage, storage } from "./config";
 import { WebhookManager } from "./webhook";
 
@@ -7,18 +8,20 @@ export class Cloner {
   source: SelfGuild;
   target: BotGuild;
   webhookManager: WebhookManager;
+  skipBackfill: boolean;
 
-  constructor(source: SelfGuild, target: BotGuild, webhookManager: WebhookManager) {
+  constructor(source: SelfGuild, target: BotGuild, webhookManager: WebhookManager, skipBackfill: boolean) {
     this.source = source;
     this.target = target;
     this.webhookManager = webhookManager;
+    this.skipBackfill = skipBackfill || false;
   }
 
   async clone(id: string): Promise<GuildBasedChannel> {
     if (storage.channels[id]) {
       const mapped = storage.channels[id];
       return await this.target.channels.fetch(mapped);
-    }
+    } 
 
     const channel = await this.source.channels.fetch(id);
     const perms = channel.permissionsFor(this.source.me);
@@ -29,17 +32,26 @@ export class Cloner {
       return null;
     }
 
+    const FORCED_TYPES = [0, 2, 4, 6, 13, 14, 15]
+    if (!FORCED_TYPES.includes(Constants.ChannelTypes[channel.type])) {
+        console.log(`[CLONER] Skipping ${channel.type} channel ${channel.name} (${channel.id}) in ${this.source.name}`);
+        storage.channels[channel.id] = null;
+        saveStorage();
+        return null;
+    }
+
     const result = await this.target.channels.create(channel.name, {
-      type: channel.type as GuildChannelTypes,
-      topic: channel.type === 'GUILD_TEXT' ? (channel as TextChannel).topic : null,
-      reason: "Cloned from " + channel.name,
-      parent: channel.parentId ? (await this.getCloned(channel.parent.id)).id : undefined,
+        type: (channel.toJSON() as any).type,
+        topic: channel.type === 'GUILD_TEXT' ? (channel as TextChannel).topic : undefined,
+        reason: "Cloned from " + channel.name,
+        parent: channel.parent ? (await this.getCloned(channel.parent.id)).id : undefined,
+        position: channel.type === ('GUILD_TEXT' || 'GUILD_CATEGORY') ? (channel as TextChannel).position : undefined
     });
 
     storage.channels[channel.id] = result.id;
     saveStorage();
 
-    console.log(`[CLONER] Clone of ${channel.type} channel ${channel.name} (${channel.id}) to ${result.name} (${result.id}) complete`);
+    console.log(`[CLONER] Clone of ${channel.type} channel ${channel.name} (${channel.id}) in ${this.source.name} to ${result.name} (${result.id}) in ${this.target.name} complete`);
     return result;
   }
 
@@ -80,15 +92,17 @@ export class Cloner {
       if (stored) continue;
 
       const channel = await this.target.channels.fetch(id);
-      console.log(`[CLONER] Purging legacy channel ${channel.name} (${channel.id})`);
+      console.log(`[CLONER] Purging legacy channel ${channel.name} (${channel.id}) in ${this.target.name}`);
       await channel.delete("Purged by cloner");
     }
   }
 
   async sync() {
-    console.log("[SELF BOT] Syncing channels...");
+    console.log(`[SELF BOT] Syncing channels for ${this.target.name}...`);
     this.webhookManager.clearWebhooks();
+    console.log(`[SELF BOT] Cleared webhooks in ${this.target.name}...`);
 
+    // We are running this loop twice to ensure that categories are created before channels.
     for (const channel of this.source.channels.cache.values()) {
       if (channel.type === "GUILD_CATEGORY") await this.clone(channel.id);
     }
@@ -98,6 +112,7 @@ export class Cloner {
     }
 
     // Rename channels
+    console.log(`[SELF BOT] Renaming channels in ${this.target.name}...`);
     for (const channel of this.source.channels.cache.values()) {
       const mapped = await this.getCloned(channel.id);
       if (!mapped || !mapped.name || !channel.name || mapped.name === channel.name) continue;
@@ -105,16 +120,21 @@ export class Cloner {
       try {
         await mapped.setName(channel.name);
       } catch (e) {
-        console.log(`[CLONER] Failed to rename channel ${channel.name} (${channel.id}) to ${mapped.name} (${mapped.id})`);
+        console.log(`[CLONER] Failed to rename channel ${channel.name} (${channel.id}) to ${mapped.name} (${mapped.id}) in ${this.target.name}...`);
       }
     }
 
-    console.log("[SELF BOT] Reordering channels...")
+    console.log(`[SELF BOT] Reordering channels in ${this.target.name}...`)
     await this.reorder();
 
     // Backlog
     if (this.source.channels.cache.size > 50) {
-        console.log("[SELF BOT] Skipping backlog due to large channel count");
+        console.log(`[SELF BOT] Skipping backlog for ${this.target.name} due to large channel count`);
+        return;
+    }
+
+    if (this.skipBackfill) {
+        // We don't want to log, because ideally the user knows they've disabled backfilling.
         return;
     }
 
@@ -139,15 +159,15 @@ export class Cloner {
       const messages = (await channel.messages.fetch({limit: 50}))
           .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
 
-      console.log(`[CLONER] Backlogging ${messages.size} in ${channel.name} (${channel.id})`);
+      console.log(`[CLONER] Backlogging ${messages.size} for ${channel.name} (${channel.id}) in ${channel.guild.name}...`);
       for (const message of messages.values()) {
         if (lastMessage && lastMessage.createdAt && lastMessage.createdAt.getTime() >= message.createdAt.getTime()) continue;
         await this.cloneMessage(message, false);
       }
 
-      console.log(`[CLONER] Backlogged ${messages.size} in ${channel.name} (${channel.id})`);
+      console.log(`[CLONER] Backlogged ${messages.size} for ${channel.name} (${channel.id}) in ${channel.guild.name}...`);
     } catch (e) {
-      console.error(`[CLONER] Failed to fetch backlog for ${channel.name} (${channel.id})`, e);
+      console.error(`[CLONER] Failed to fetch backlog for ${channel.name} (${channel.id}) in ${channel.guild.name}...`, e);
     }
   }
 
@@ -168,7 +188,7 @@ export class Cloner {
           content += `> ${reference.content.split("\n").join("\n> ")}\n> Reply from ${reference.author}\n`;
         }
       } catch (e) {
-        console.error(`[CLONER] Failed to fetch reference message for ${message.id}`, e);
+        console.error(`[CLONER] Failed to fetch reference message for ${message.id} in ${message.guild.name}`, e);
       }
     }
 
@@ -205,21 +225,15 @@ export class Cloner {
     content = content.trim();
     if (!content.length && !message.attachments.size && !message.embeds.length) return;
 
-    const contentSplit = content.match(/[\s\S]{1,2000}/g) || [];
-    for (let i = 0; i < contentSplit.length; i++) {
-      const content = contentSplit[i];
-      const final = i === contentSplit.length - 1;
-
-      await webhook.send({
-        content,
-        username: message.author.username,
-        avatarURL: message.author.avatarURL(),
-        embeds: final ? message.embeds : undefined,
-        files: final ? message.attachments.map(a => a.url) : undefined,
-        allowedMentions: {
-          parse: mentions ? ["users", "roles", "everyone"] : [],
-        }
-      });
-    }
+    await webhook.send({
+      content: content.length > 2000 ? content.slice(0, 1995) + '[...]' : content.length ? content : undefined,
+      username: message.author.username,
+      avatarURL: message.author.avatarURL(),
+      embeds: message.embeds ? message.embeds : undefined,
+      files: message.attachments ? message.attachments.map(a => a.url) : undefined,
+      allowedMentions: {
+        parse: mentions ? ["users", "roles", "everyone"] : [],
+      }
+    });
   }
 }
