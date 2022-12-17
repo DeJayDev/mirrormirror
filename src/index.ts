@@ -1,7 +1,7 @@
-import DiscordSelfbot from "discord.js-selfbot-v13";
 import { Client, Intents } from "discord.js";
-import { config } from "./config";
+import DiscordSelfbot from "discord.js-selfbot-v13";
 import { Cloner } from "./cloner";
+import { config } from "./config";
 import { WebhookManager } from "./webhook";
 
 const selfBotClient = new DiscordSelfbot.Client({
@@ -55,7 +55,10 @@ selfBotClient.on("messageCreate", async message => {
     title = message.embeds[0].title;
   }
 
-  //console.log(`[${message.guild.name}] ${message.author.username}: ${message.content ? message.content : message.embeds[0].title}`);
+  if(process.env.LOG_MESSAGES) {
+    console.log(`[${message.guild.name}] ${message.author.username}: ${message.content ? message.content : message.embeds[0].title}`);
+  }
+  
   await cloner.cloneMessage(message);
 });
 

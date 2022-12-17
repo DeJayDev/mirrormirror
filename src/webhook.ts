@@ -1,4 +1,4 @@
-import {GuildBasedChannel, GuildTextBasedChannel, TextChannel, Webhook} from "discord.js";
+import { GuildBasedChannel, TextChannel, Webhook } from "discord.js";
 
 export class WebhookManager {
   name: string;

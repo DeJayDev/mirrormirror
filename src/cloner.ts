@@ -1,6 +1,5 @@
 import { ChannelPosition, Constants, Guild as BotGuild, GuildBasedChannel, GuildTextBasedChannel, Webhook } from "discord.js";
 import { Guild as SelfGuild, GuildTextBasedChannel as SelfGuildTextBasedChannel, Message as SelfMessage, TextChannel } from "discord.js-selfbot-v13";
-import { ChannelTypes } from "discord.js/typings/enums";
 import { saveStorage, storage } from "./config";
 import { WebhookManager } from "./webhook";
 
