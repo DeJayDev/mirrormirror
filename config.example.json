@@ -1,16 +1,16 @@
 {
-    "tokens": {
-      "user": "USER_TOKEN",
-      "bot": "BOT_TOKEN"
+  "tokens": {
+    "user": "USER_TOKEN",
+    "bot": "BOT_TOKEN"
+  },
+  "guilds": [
+    {
+      "source": "SOURCE_GUILD_ID",
+      "target": "TARGET_GUILD_ID"
     },
-    "guilds": [
-      {
-          "source": "SOURCE_GUILD_ID",
-          "target": "TARGET_GUILD_ID"
-      },
-      {
-          "source": "SOURCE_GUILD_ID",
-          "target": "TARGET_GUILD_ID"
-      }
-    ]
-  }
+    {
+      "source": "SOURCE_GUILD_ID",
+      "target": "TARGET_GUILD_ID"
+    }
+  ]
+}

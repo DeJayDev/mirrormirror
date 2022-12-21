@@ -1,36 +1,38 @@
 import fs from "fs";
 
-export const config: Config = require("../config.json");
+import * as configFile from "../config.json";
+
+export const config: Config = configFile;
 
 export interface Config {
   tokens: {
-    user: string,
-    bot: string,
-  },
-  guilds: {
-    source: string,
-    target: string,
-    skipBackfill?: boolean,
-  }[]
+    user: string;
+    bot: string;
+  };
+  guilds: Array<{
+    source: string;
+    target: string;
+    skipBackfill?: boolean;
+  }>;
 }
 
 export interface MirrorStorage {
   // Old channel ID -> New channel ID
-  channels: {
-    [channelId: string]: string,
-  },
+  channels: Map<string, string>;
 
   // Old channel ID -> Last backlog message ID
-  backlog: {
-    [channelId: string]: string,
-  }
+  backlog: Map<string, string>;
 }
 
-const getStorage = (): MirrorStorage => fs.existsSync("storage.json") ? JSON.parse(fs.readFileSync("storage.json", "utf8")) : {
-  backlog: {},
-  channels: {},
-};
+const getStorage = (): MirrorStorage =>
+  fs.existsSync("storage.json")
+    ? JSON.parse(fs.readFileSync("storage.json", "utf8"))
+    : {
+        backlog: {},
+        channels: {},
+      };
 
 export const storage: MirrorStorage = getStorage();
 
-export const saveStorage = (): void => fs.writeFileSync("storage.json", JSON.stringify(storage));
+export const saveStorage = (): void =>
+  fs.writeFileSync("storage.json", JSON.stringify(storage));
