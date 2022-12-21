@@ -7,7 +7,7 @@
 Mirror Mirror allows you to perfectly and silently clone Discord server from a user
 account to another server, through a user <-> bot bridge.
 
-> **BIG DISCLAIMER**
+### :alert: **BIG DISCLAIMER** :alert: 
 >
 > Running this bot **VIOLATES THE DISCORD TERMS OF SERVICE**.
 > 
