@@ -1,5 +1,5 @@
 .idea/
-lib/
+build/
 node_modules/
 config.json
 storage.json
